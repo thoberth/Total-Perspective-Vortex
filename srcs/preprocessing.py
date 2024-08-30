@@ -22,7 +22,7 @@ def retrieve_data(path: str)-> dict:
 	os.chdir(path)
 	runs = [f'R{i:02}' for i in range(3, 15)]
 	data = {}
-	ls = os.listdir()[:35]
+	ls = os.listdir()[:15]
 	for directory in tqdm(ls):
 		if directory.startswith('S') and not directory.endswith('.txt'):
 			os.chdir(directory)
@@ -52,7 +52,7 @@ def parse_filter_data(data: dict):
 	mne.datasets.eegbci.standardize(raw=data)
 
 	montage = mne.channels.make_standard_montage("biosemi64")
-	print(montage.ch_names)
+	# print(montage.ch_names)
 	data.set_montage(montage, on_missing='ignore')
 	# data.plot()
 	# plt.show()
@@ -67,7 +67,6 @@ def parse_filter_data(data: dict):
 	return data['T1'].get_data(copy=False), data['T2'].get_data(copy=False)
 	# Here sort data by "Label" / "Anotations"
 	# For each person retrieve T1 and T2 for motion A and B
-
 
 
 if __name__=='__main__':
