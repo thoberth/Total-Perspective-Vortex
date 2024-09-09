@@ -7,8 +7,10 @@ from tqdm.auto import tqdm
 import sys
 from typing import List
 
+
 PWD=os.getcwd()
 PATH='/mnt/nfs/homes/thoberth/sgoinfre/physionet.org/files/eegmmidb/1.0.0/'
+
 
 def retrieve_data(path: str)-> dict:
 	"""
@@ -22,7 +24,7 @@ def retrieve_data(path: str)-> dict:
 	os.chdir(path)
 	runs = [f'R{i:02}' for i in range(3, 15)]
 	data = {}
-	ls = os.listdir()[:15]
+	ls = os.listdir()[:60]
 	for directory in tqdm(ls):
 		if directory.startswith('S') and not directory.endswith('.txt'):
 			os.chdir(directory)
@@ -46,8 +48,7 @@ def parse_filter_data(data: dict):
 	"""
 	"""
 	# focus on typical EEG Bands
-	new_data = mne.io.concatenate_raws([data[key] for key in data])
-	data = new_data
+	data = mne.io.concatenate_raws([data[key] for key in data])
 
 	mne.datasets.eegbci.standardize(raw=data)
 
@@ -65,8 +66,10 @@ def parse_filter_data(data: dict):
 					tmin=0.1, tmax=0.1, baseline=None, preload=True,\
 					verbose=False)
 	return data['T1'].get_data(copy=False), data['T2'].get_data(copy=False)
-	# Here sort data by "Label" / "Anotations"
-	# For each person retrieve T1 and T2 for motion A and B
+
+
+def streaming():
+	pass
 
 
 if __name__=='__main__':
