@@ -3,6 +3,7 @@ from pyedflib import highlevel
 import numpy as np
 import os
 import mne
+from sklearn.linear_model import SGDClassifier 
 from tqdm.auto import tqdm
 import sys
 from typing import List
@@ -24,9 +25,9 @@ def retrieve_data(path: str)-> dict:
 	os.chdir(path)
 	runs = [f'R{i:02}' for i in range(3, 15)]
 	data = {}
-	ls = os.listdir()[:60]
+	ls = os.listdir()[:40]
 	for directory in tqdm(ls):
-		if directory.startswith('S') and not directory.endswith('.txt'):
+		try:
 			os.chdir(directory)
 			sub_ls=os.listdir()
 			for file in sub_ls:
@@ -40,36 +41,44 @@ def retrieve_data(path: str)-> dict:
 					except:
 						print(f"Something went wrong with file :{file}")
 			os.chdir('..')
+		except:
+			pass
 	os.chdir(PWD)
 	return data
 
 
-def parse_filter_data(data: dict):
+def parse_filter_data(data: dict, standardize : str = "mne"):
 	"""
+		This function receive extracted data from "mne.io.read_raw_edf",
+		the function parse data, for each event and standardizes it.
+		Args:
+			data: a dict which contain name_of_experiment:data
+			standardize: a str should be "mne" or "sklearn" it define
+		the module uses to standardize the data
 	"""
+	if standardize not in ["sklearn", "mne"]:
+		raise ValueError("Invalid value for standardize. It must be either 'mne' or 'sklearn'.")
+
 	# focus on typical EEG Bands
 	data = mne.io.concatenate_raws([data[key] for key in data])
 
-	mne.datasets.eegbci.standardize(raw=data)
+	if standardize == 'mne':
+		print("mne normalisation ...")
+		mne.datasets.eegbci.standardize(raw=data)
+	print(type(data.get_data()), data.get_data().shape)
 
 	montage = mne.channels.make_standard_montage("biosemi64")
-	# print(montage.ch_names)
 	data.set_montage(montage, on_missing='ignore')
-	# data.plot()
-	# plt.show()
+
 	data.filter(l_freq=13, h_freq=30, verbose=False)
-	# data.plot()
-	# plt.show()
-	events, event_id = mne.events_from_annotations(data, event_id =dict(T1=1, T2=2), verbose=False)
+
+	events, event_id = mne.events_from_annotations(data, event_id = dict(T1=1, T2=2), verbose=False)
 	data = mne.Epochs(data.filter(l_freq=13, h_freq=30, verbose=False),\
-					events=events, event_id=event_id,\
-					tmin=0.1, tmax=0.1, baseline=None, preload=True,\
-					verbose=False)
-	return data['T1'].get_data(copy=False), data['T2'].get_data(copy=False)
-
-
-def streaming():
-	pass
+					events=events, event_id=event_id, preload=True,\
+					verbose=False, baseline=None)
+	dataT1 = data['T1'].get_data(copy=False)
+	dataT2 = data['T2'].get_data(copy=False)
+	return dataT1.reshape(dataT1.shape[0], -1), dataT2.reshape(dataT2.shape[0], -1)
 
 
 if __name__=='__main__':
