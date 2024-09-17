@@ -70,15 +70,15 @@ def parse_filter_data(data: dict, standardize : str = "mne"):
 	montage = mne.channels.make_standard_montage("biosemi64")
 	data.set_montage(montage, on_missing='ignore')
 
-	data.filter(l_freq=13, h_freq=30, verbose=False)
+	data.filter(l_freq=1, h_freq=30, verbose=False)
 
 	events, event_id = mne.events_from_annotations(data, event_id = dict(T1=1, T2=2), verbose=False)
 	data = mne.Epochs(data.filter(l_freq=13, h_freq=30, verbose=False),\
 					events=events, event_id=event_id, preload=True,\
 					verbose=False, baseline=None)
-	dataT1 = data['T1'].get_data(copy=False)
-	dataT2 = data['T2'].get_data(copy=False)
-	return dataT1.reshape(dataT1.shape[0], -1), dataT2.reshape(dataT2.shape[0], -1)
+	X = data.get_data(copy=False)
+	y = data.events[:, -1]#.reshape(-1, 1)
+	return X, y
 
 
 if __name__=='__main__':
