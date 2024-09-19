@@ -10,6 +10,13 @@ def retrieve_path():
 	return data['path_to_folder_corr'].replace("USERNAME", os.getenv("USER"))
 
 
+def standardization_argument(value):
+	errorMsg = f"The standardization value '{value}' must be 'mne' or 'zscore'"
+	if value not in ['mne', 'zscore']:
+		raise argparse.ArgumentTypeError(errorMsg)
+	return value
+
+
 def subject_argument(value): # ajouter la possibilite d'avoir plusieurs valeurs ou un range
 	errorMsg = f"The subject value '{value}' must be an int between 1 and 109!"
 	if isinstance(value, list):
