@@ -2,12 +2,15 @@ import numpy as np
 import argparse
 import os
 import json
-
+import platform
 
 def retrieve_path():
 	with open('srcs/json/path.json', 'r') as f:
 		data = json.load(f)
-	return data['path_to_folder_corr'].replace("USERNAME", os.getenv("USER"))
+	if platform.system() == "Darwin":
+		return os.getcwd() + "/data/"
+	else:
+		return data['path_to_folder_corr'].replace("USERNAME", os.getenv("USER"))
 
 
 def standardization_argument(value):
