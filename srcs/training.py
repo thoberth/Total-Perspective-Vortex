@@ -1,5 +1,8 @@
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression as LR
+from sklearn.ensemble import RandomForestClassifier as RFC
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 import sys, os
 from tqdm.auto import tqdm
 from typing import List
@@ -8,6 +11,7 @@ from mne.datasets.eegbci import load_data, standardize
 from mne import Epochs, events_from_annotations
 from mne.channels import make_standard_montage # "biosemi64"
 from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.decomposition import PCA
 from itertools import chain
 from termcolor import colored
 import numpy as np
@@ -24,26 +28,25 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 	data_clean = []
 	for file in tqdm(path):
 		data = read_raw_edf(file, verbose=False, preload=True)
-		montage = make_standard_montage("biosemi64")
+		montage = make_standard_montage("standard_1020")
 		data.set_montage(montage, on_missing='ignore')
 		if plot:
-			data.plot_psd()
+			data.compute_psd().plot()
 			data.plot(scalings=dict(eeg=250e-6))
 			plt.show()
 		if data.info['sfreq'] != 160:
 			print(colored(f"{file} cannot be used, the frequency is not valid", "red"))
 			continue
-		data.filter(l_freq=0.5, h_freq=30, fir_design='firwin', verbose=False)
+		data.filter(l_freq=13, h_freq=30, fir_design='firwin', verbose=False) # testez avec 7, 30 et notch_filter
 		if standardize_method == "mne":
 			standardize(raw=data)
 		if plot:
-			data.plot_psd()
+			data.compute_psd().plot()
 			data.plot(scalings=dict(eeg=250e-6))
 			plt.show()
 			plot=False
 		events, event_id = events_from_annotations(data, event_id = dict(T1=1, T2=2), verbose=False)
-		data = Epochs(data.filter(l_freq=13, h_freq=30, verbose=False),\
-					events=events, event_id=event_id, preload=True,\
+		data = Epochs(data, events=events, event_id=event_id, preload=True,\
 					verbose=False, baseline=None)
 		data_clean.append(data)
 	X = np.concatenate([i.get_data() for i in data_clean])
@@ -62,10 +65,16 @@ def train(path: str, subject: List, experiment: List, standardization: str, plot
 	
 	print("Retrieving data from edf files...")
 	X, y = retrieve_raw_data(path_to_stored_data, standardization, plot)
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
+	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
+	# X = X.reshape((X.shape[0], -1))
+	# pipe = Pipeline([('lda', LDA()), ('svm', SVC())], verbose=False)
 	pipe = Pipeline([('csp', CSP()), ('svm', SVC())], verbose=False)
+	# pipe = Pipeline([('csp', csp), ('rfc', RFC())], verbose=False)
+	# pipe = Pipeline([('csp', csp), ('lr', LR())], verbose=False)
 	score = []
-	for i in range(3, 25):
+	for i in range(8, 15):
 		pipe.set_params(csp__n_components=i)
+		# pipe2.set_params(csp__n_components=i)
+		# pipe3.set_params(csp__n_components=i)
 		score.append((i, pipe.fit(X_train, y_train).score(X_test, y_test)))
 	[print(i[0], i[1]) for i in score]
