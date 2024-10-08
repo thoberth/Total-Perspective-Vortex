@@ -3,6 +3,7 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.ensemble import RandomForestClassifier as RFC
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.metrics import accuracy_score
 import sys, os
 from tqdm.auto import tqdm
 from typing import List
@@ -17,6 +18,7 @@ from termcolor import colored
 import numpy as np
 import matplotlib.pyplot as plt
 from mne.decoding import CSP
+from multiprocessing import cpu_count
 
 def z_score_normalize(eeg_data):
 	mean_val = np.mean(eeg_data, axis=0)
@@ -26,7 +28,7 @@ def z_score_normalize(eeg_data):
 def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool = False ):
 	#TO DO factoriser la fonction et plot une seule windows avec tout les avant/apres
 	data_clean = []
-	for file in tqdm(path):
+	for i, file in enumerate(tqdm(path)):
 		data = read_raw_edf(file, verbose=False, preload=True)
 		montage = make_standard_montage("standard_1020")
 		data.set_montage(montage, on_missing='ignore')
@@ -37,7 +39,8 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 		if data.info['sfreq'] != 160:
 			print(colored(f"{file} cannot be used, the frequency is not valid", "red"))
 			continue
-		data.filter(l_freq=7, h_freq=35, fir_design='firwin', verbose=False) # testez avec 7, 30 et notch_filter
+		data.notch_filter(60, picks='eeg', method="iir", verbose=False)
+		data.filter(l_freq=8, h_freq=20, fir_design='firwin', verbose=False)
 		if standardize_method == "mne":
 			standardize(raw=data)
 		if plot:
@@ -45,9 +48,15 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 			data.plot(scalings=dict(eeg=250e-6))
 			plt.show()
 			plot=False
-		events, event_id = events_from_annotations(data, event_id = dict(T1=1, T2=2), verbose=False)
+		events, event_id = events_from_annotations(data, event_id ='auto', verbose=False)
+		# print(event_id)
 		data = Epochs(data, events=events, event_id=event_id, preload=True,\
-					verbose=False, baseline=None)
+					verbose=False)
+		# print(data.get_data())
+		# break
+		# print(file, data.get_data().shape)
+		# if i> 14:
+		# 	exit()
 		data_clean.append(data)
 	X = np.concatenate([i.get_data() for i in data_clean])
 	y = np.concatenate([i.events[:, -1] for i in data_clean])
@@ -65,16 +74,7 @@ def train(path: str, subject: List, experiment: List, standardization: str, plot
 	
 	print("Retrieving data from edf files...")
 	X, y = retrieve_raw_data(path_to_stored_data, standardization, plot)
-	X = X.reshape((X.shape[0], -1))
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-	# pipe = Pipeline([('lda', LDA()), ('svm', SVC())], verbose=False)
-	pipe = Pipeline([('pca', PCA(n_components=1000)), ('svm', SVC(verbose=True))], verbose=True)
-	# pipe = Pipeline([('csp', csp), ('rfc', RFC())], verbose=False)
-	# pipe = Pipeline([('csp', csp), ('lr', LR())], verbose=False)
-	score = []
-	# for i in range(4, 35):
-	# 	pipe.set_params(csp__n_components=i)
-		# pipe2.set_params(csp__n_components=i)
-		# pipe3.set_params(csp__n_components=i)
-	score.append((10, pipe.fit(X_train, y_train).score(X_test, y_test)))
-	[print(i[0], i[1]) for i in score]
+	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.10, random_state=42)
+	print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+	pipe = Pipeline([('csp', CSP(n_components=15)), ('lda', LDA())], verbose=False)
+	print(cross_val_score(pipe, X, y, cv=10))

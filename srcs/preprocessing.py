@@ -21,7 +21,7 @@ def retrieve_data(path: str)-> dict:
 	"""
 	if not os.path.exists(path):
 		print(f"This path is incorrect {path} !", file=sys.stderr)
-		exit(1)
+		exit()
 	os.chdir(path)
 	runs = [f'R{i:02}' for i in range(3, 15)]
 	data = {}

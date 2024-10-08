@@ -1,4 +1,5 @@
 import mne
+mne.set_log_level("CRITICAL")
 import numpy as np
 from tqdm.auto import tqdm
 from sklearn.model_selection import cross_val_score, train_test_split
