@@ -70,7 +70,7 @@ def parse_filter_data(data: dict, standardize : str = "mne"):
 	montage = mne.channels.make_standard_montage("biosemi64")
 	data.set_montage(montage, on_missing='ignore')
 
-	data.filter(l_freq=0.5, h_freq=30, verbose=False)
+	# data.filter(l_freq=0.5, h_freq=30, verbose=False)
 
 	events, event_id = mne.events_from_annotations(data, event_id = dict(T1=1, T2=2), verbose=False)
 	data = mne.Epochs(data.filter(l_freq=13, h_freq=30, verbose=False),\

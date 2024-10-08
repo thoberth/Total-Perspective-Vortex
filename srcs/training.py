@@ -37,7 +37,7 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 		if data.info['sfreq'] != 160:
 			print(colored(f"{file} cannot be used, the frequency is not valid", "red"))
 			continue
-		data.filter(l_freq=13, h_freq=30, fir_design='firwin', verbose=False) # testez avec 7, 30 et notch_filter
+		data.filter(l_freq=7, h_freq=35, fir_design='firwin', verbose=False) # testez avec 7, 30 et notch_filter
 		if standardize_method == "mne":
 			standardize(raw=data)
 		if plot:
@@ -65,16 +65,16 @@ def train(path: str, subject: List, experiment: List, standardization: str, plot
 	
 	print("Retrieving data from edf files...")
 	X, y = retrieve_raw_data(path_to_stored_data, standardization, plot)
+	X = X.reshape((X.shape[0], -1))
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-	# X = X.reshape((X.shape[0], -1))
 	# pipe = Pipeline([('lda', LDA()), ('svm', SVC())], verbose=False)
-	pipe = Pipeline([('csp', CSP()), ('svm', SVC())], verbose=False)
+	pipe = Pipeline([('pca', PCA(n_components=1000)), ('svm', SVC(verbose=True))], verbose=True)
 	# pipe = Pipeline([('csp', csp), ('rfc', RFC())], verbose=False)
 	# pipe = Pipeline([('csp', csp), ('lr', LR())], verbose=False)
 	score = []
-	for i in range(8, 15):
-		pipe.set_params(csp__n_components=i)
+	# for i in range(4, 35):
+	# 	pipe.set_params(csp__n_components=i)
 		# pipe2.set_params(csp__n_components=i)
 		# pipe3.set_params(csp__n_components=i)
-		score.append((i, pipe.fit(X_train, y_train).score(X_test, y_test)))
+	score.append((10, pipe.fit(X_train, y_train).score(X_test, y_test)))
 	[print(i[0], i[1]) for i in score]
