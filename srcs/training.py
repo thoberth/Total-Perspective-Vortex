@@ -65,6 +65,7 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 	# filter any bad channels that were identified to have artifacts
 	picks = pick_types(X.info, meg=False, eeg=True, stim=False, eog=False, exclude='bads')
 
+	print("Compute ICA ...")
 	ica = ICA(n_components=15, method='fastica', random_state=97, max_iter='auto')
 	ica.fit(X, picks=picks)
 	if plot:
@@ -78,6 +79,7 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 	ica.exclude = eog_indices  # Exclure les composantes identifiées
 
 	# Reconstruire les signaux EEG sans les artefacts
+	print("Apply ICA ...")
 	X = ica.apply(X.copy(), exclude=ica.exclude)
 	X = Epochs(X, events=events, event_id=event_id, preload=True,\
 					verbose=False)
@@ -86,6 +88,7 @@ def retrieve_raw_data(path: str, standardize_method : str = "mne", plot : bool =
 	X =	X.get_data()
 	print(X.shape, y.shape)
 	# if standardize_method == "zscore":
+	print("Standardize data ...")
 	X = z_score_normalize(X)
 	return X, y
 
@@ -102,7 +105,7 @@ def train(path: str, subject: List, experiment: List, standardization: str, plot
 
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 	print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
-	pipe = Pipeline([('csp', CSP()), ('svc', SVC())], verbose=False)
+	pipe = Pipeline([('csp', CSP()), ('svc', SVC())], verbose=True)
 	print("SVC", pipe.fit(X_train, y_train).score(X_test, y_test))
 	# param_grid = {
 	# 'csp__n_components': [16, 20, 24, 28, 32],  # Nombre de filtres spatiaux
