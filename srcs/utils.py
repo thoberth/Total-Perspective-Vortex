@@ -3,6 +3,8 @@ import argparse
 import os
 import json
 import platform
+import pickle
+from sklearn.pipeline import Pipeline
 
 def retrieve_path():
 	with open('srcs/json/path.json', 'r') as f:
@@ -11,13 +13,6 @@ def retrieve_path():
 		return os.getcwd() + "/data/"
 	else:
 		return data['path_to_folder_corr'].replace("USERNAME", os.getenv("USER"))
-
-
-def standardization_argument(value):
-	errorMsg = f"The standardization value '{value}' must be 'mne' or 'zscore'"
-	if value not in ['mne', 'zscore']:
-		raise argparse.ArgumentTypeError(errorMsg)
-	return value
 
 
 def subject_argument(value): # ajouter la possibilite d'avoir plusieurs valeurs ou un range
@@ -57,9 +52,22 @@ def experiment_argument(value):
 	else:
 		raise argparse.ArgumentTypeError(errorMsg)
 
-
 def action_argument(value):
 	if value not in ["predict", "train", "cross_val"]:
 		raise argparse.ArgumentTypeError(f"The action value '{value}' must be 'train' or 'predict' or 'cross_val'")
 	return value
 
+def save_model(model: Pipeline):
+	path = os.getcwd()+'/model/'
+	if not os.path.exists(path):
+		os.makedirs('model')
+	with open(path+'pipeline.pickle', 'wb') as f:
+		pickle.dump(model, f)
+
+def load_model() -> Pipeline:
+	path=os.getcwd()+'/model/pipeline.pickle'
+	if not os.path.exists(path):
+		raise FileNotFoundError()
+	with open(path, 'rb') as f:
+		model = pickle.load(f)
+	return model

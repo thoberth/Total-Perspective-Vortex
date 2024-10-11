@@ -21,17 +21,43 @@ from mne.decoding import CSP
 from mne.preprocessing import ICA
 from mne.datasets import eegbci
 from multiprocessing import cpu_count
+from utils import save_model
 
 def z_score_normalize(eeg_data):
 	mean_val = np.mean(eeg_data, axis=0)
 	std_val = np.std(eeg_data, axis=0)
 	return (eeg_data - mean_val) / std_val
 
-def retrieve_raw_data(raw_fnames: str, standardize_method : str = "mne", plot : bool = False ):
-	#TO DO factoriser la fonction et plot une seule windows avec tout les avant/apres
+def plot_function(raw):
+		raw.plot(scalings=dict(eeg=250e-6))
+		raw.compute_psd().plot()
 
+		plt.show()
+
+def apply_ica(raw, picks, plot):
+	print("\rCompute ICA ..." + " " * 20,  end="")
+	ica = ICA(method='fastica', random_state=97, max_iter='auto')
+	ica.fit(raw, picks=picks)
+
+	eog_channels = ['Fpz']  # Remplacez par les canaux appropriés si vous n'avez pas de canaux EOG explicites
+
+	# Identifier les artefacts (par exemple, EOG pour les clignements d'yeux)
+	eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_channels, threshold=1.5)
+	ica.exclude = eog_indices  # Exclure les composantes identifiées
+	if plot:
+		ica.plot_components(picks=ica.exclude, show=True)
+		plt.show()
+
+	# Reconstruire les signaux EEG sans les artefacts
+	print("\rApply ICA ...           ", end="")
+	# print(f"Exclude : {ica.exclude}")
+	raw = ica.apply(raw.copy(), exclude=ica.exclude)
+	return raw
+
+
+def retrieve_raw_data(raw_fnames: str, plot : bool = False ):
 	raw = concatenate_raws([read_raw_edf(f, preload=True) for f in raw_fnames])
-	events, event_id = events_from_annotations(raw, event_id='auto', verbose=False)
+	events, _ = events_from_annotations(raw, verbose=False)
 	mapping = {1: 'rest', 2: 'feet', 3: 'hands'}
 	annot_from_events = annotations_from_events(
 		events=events, event_desc=mapping, sfreq=raw.info['sfreq'],
@@ -43,74 +69,44 @@ def retrieve_raw_data(raw_fnames: str, standardize_method : str = "mne", plot : 
 	raw.set_eeg_reference(projection=True)
 
 	if plot:
-		pass
-		#create a fonction to plot raw_data before and after
-	# 		data.compute_psd().plot()
-	# 		data.plot(scalings=dict(eeg=250e-6))
-	# 		plt.show()
-
+		plot_function(raw)
 	raw.notch_filter(60, picks='eeg', fir_design="firwin", verbose=False)
 	raw.filter(l_freq=7, h_freq=30, fir_design='firwin', verbose=False)
 
-
 	picks = pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude='bads')
 
-	print("Compute ICA ...")
-	ica = ICA(method='fastica', random_state=97, max_iter='auto')
-	ica.fit(raw, picks=picks)
+	raw = apply_ica(raw, picks, plot)
+
 	if plot:
-		ica.plot_components()
-		plt.show()
-
-	eog_channels = ['Fpz']  # Remplacez par les canaux appropriés si vous n'avez pas de canaux EOG explicites
-
-	# Identifier les artefacts (par exemple, EOG pour les clignements d'yeux)
-	eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_channels, threshold=1.5)
-	ica.exclude = eog_indices  # Exclure les composantes identifiées
-
-	# Reconstruire les signaux EEG sans les artefacts
-	print("Apply ICA ...")
-	print(f"Exclude : {ica.exclude}")
-	raw = ica.apply(raw.copy(), exclude=ica.exclude)
-
-	raw = Epochs(raw, events=events, event_id=event_id, preload=True,\
-					verbose=False, picks=picks, proj=True)
-
+		plot_function(raw)
+	raw = Epochs(raw, events=events, event_id=dict(Feet=1, Hand=2), preload=True,\
+					verbose=False, picks=picks, proj=True, tmin=-1.0, tmax=4.0)
 	y = np.array(raw.events[:, -1])
 	X =	raw.get_data()
-	print("Standardize data ...")
+	print("\rStandardize data ...", end="")
 	X = z_score_normalize(X)
 	return X, y
 
 
-def train(path: str, subject: List, experiment: List, standardization: str, plot: bool):
+def train(path: str, subject: List, experiment: List, plot: bool):
 	print("Downloading files if they aren't already downloaded...")
 	path_to_stored_data = []
-	for index_subject in tqdm(subject):
+	for index_subject in subject:
+		# print(f"Test for subject {index_subject}")
 		path_to_stored_data.append(load_data(subject=index_subject, runs=experiment, path=path))
 	path_to_stored_data = list(chain(*path_to_stored_data))
-	
-	print("Retrieving data from edf files...")
-	X, y = retrieve_raw_data(path_to_stored_data, standardization, plot)
+	print("Retrieving data from edf files...", end="")
+	X, y = retrieve_raw_data(path_to_stored_data, plot)
 
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-	print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
-	pipe = Pipeline([('csp', CSP(n_components=6)), ('svc', SVC())], verbose=False)
+	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
+	pipe = Pipeline([('csp', CSP(n_components=4, log=True)), ('svc', SVC())], verbose=False)
 
 	cv_score = cross_val_score(pipe, X_train, y_train, cv=5)
-	print(cv_score, cv_score.mean(), sep='\nMean : ')
-	print("Test: ",  pipe.fit(X_train, y_train).score(X_test, y_test))
+	print("\rMean accuracy on train set: ", cv_score.mean())
+	print("Accuracy on test set: ",  pipe.fit(X_train, y_train).score(X_test, y_test), end= '\n\n')
 
-# 	param_grid = {
-# 	'csp__n_components': [5, 6, 7, 8],  # Nombre de filtres spatiaux
-# 	'csp__reg': [None, 1, 0.1, 0.01],  # Paramètres de régularisation
-# }
-# 	grid = GridSearchCV(pipe, param_grid, cv=5)
-# 	grid.fit(X_train, y_train)
+	save_model(pipe)
 
-# 	print("Meilleurs hyperparamètres :", grid.best_params_)
-# 	print("Meilleure précision sur le set d'entraînement :", grid.best_score_)
-
-# 	y_pred = grid.predict(X_test)
-# 	print("Rapport de classification :\n", classification_report(y_test, y_pred))
-# 	print("Précision sur le set de test :", accuracy_score(y_test, y_pred))
+	# y_pred = pipe.predict(X_test)
+	# print(classification_report(y_test, pipe.predict(X_test), zero_division=0))
+	
