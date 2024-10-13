@@ -7,7 +7,7 @@ import argparse
 from utils import retrieve_path, subject_argument, experiment_argument, action_argument
 import os
 from training import train
-# from predict import predict
+from predict import predict
 # from cross_validation import cross_val
 
 
@@ -20,8 +20,8 @@ if __name__ == "__main__":
 	parser.add_argument("-v", "--verbose")
 	parser.add_argument("-p", "--plot", default=False, action="store_true", help="Plot the difference between raw data and data filtered")
 	parser.add_argument("action", nargs='?', default="cross_val", type=action_argument, help="Specify a number")
-	parser.add_argument("-s", "--subject", nargs='*', type=int, default=[1, 109], help="The subject(s) to train or to predict")
-	parser.add_argument("-e", "--experiment", nargs='*', type=int, default=[1, 14], help="The experiment(s) to train or to predict")
+	parser.add_argument("-s", "--subject", nargs='*', type=int, default=[1, 21], help="The subject(s) to train or to predict")
+	parser.add_argument("-e", "--experiment", nargs='*', type=int, default=[3, 14], help="The experiment(s) to train or to predict")
 
 	# optional
 	args = parser.parse_args()
@@ -33,4 +33,7 @@ if __name__ == "__main__":
 		exit(1)
 	path = retrieve_path()
 
-	train(path, args.subject, args.experiment, args.plot)
+	if args.action == 'train':
+		train(path, args.subject, args.experiment, args.plot)
+	elif args.action == 'predict':
+		predict(path, args.subject, args.experiment)

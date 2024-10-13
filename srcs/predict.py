@@ -1,7 +1,7 @@
 from typing import List
-from srcs.training import retrieve_raw_data
+from training import retrieve_raw_data
 from mne.datasets.eegbci import load_data
-from .utils import load_model
+from utils import load_model
 from itertools import chain
 
 def predict(path: str, subject: List[str], experiment: List[str]):
@@ -12,4 +12,4 @@ def predict(path: str, subject: List[str], experiment: List[str]):
 	path_to_stored_data = list(chain(*path_to_stored_data))
 	X, y = retrieve_raw_data(path_to_stored_data, plot=False)
 
-	print("Prediction score:", pipe.score(X, y))
+	print("\nPrediction score:", pipe.score(X, y))

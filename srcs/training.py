@@ -42,16 +42,16 @@ def apply_ica(raw, picks, plot):
 	eog_channels = ['Fpz']  # Remplacez par les canaux appropriés si vous n'avez pas de canaux EOG explicites
 
 	# Identifier les artefacts (par exemple, EOG pour les clignements d'yeux)
-	eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_channels, threshold=1.5)
+	eog_indices, _ = ica.find_bads_eog(raw, ch_name=eog_channels, threshold=1.5)
 	ica.exclude = eog_indices  # Exclure les composantes identifiées
 	if plot:
 		ica.plot_components(picks=ica.exclude, show=True)
-		plt.show()
 
 	# Reconstruire les signaux EEG sans les artefacts
 	print("\rApply ICA ...           ", end="")
 	# print(f"Exclude : {ica.exclude}")
 	raw = ica.apply(raw.copy(), exclude=ica.exclude)
+
 	return raw
 
 
@@ -79,8 +79,12 @@ def retrieve_raw_data(raw_fnames: str, plot : bool = False ):
 
 	if plot:
 		plot_function(raw)
-	raw = Epochs(raw, events=events, event_id=dict(Feet=1, Hand=2), preload=True,\
-					verbose=False, picks=picks, proj=True, tmin=-1.0, tmax=4.0)
+	try:
+		raw = Epochs(raw, events=events, event_id=dict(Feet=1, Hand=2), preload=True,\
+						verbose=False, picks=picks, proj=True, tmin=-1.0, tmax=4.0)
+	except ValueError:
+		print(colored("\nThere is no data for training or prediction! Please select others files", "red"))
+		exit(1)
 	y = np.array(raw.events[:, -1])
 	X =	raw.get_data()
 	print("\rStandardize data ...", end="")
@@ -101,7 +105,7 @@ def train(path: str, subject: List, experiment: List, plot: bool):
 	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
 	pipe = Pipeline([('csp', CSP(n_components=4, log=True)), ('svc', SVC())], verbose=False)
 
-	cv_score = cross_val_score(pipe, X_train, y_train, cv=5)
+	cv_score = cross_val_score(pipe, X_train, y_train, cv=5, n_jobs=cpu_count() - 1)
 	print("\rMean accuracy on train set: ", cv_score.mean())
 	print("Accuracy on test set: ",  pipe.fit(X_train, y_train).score(X_test, y_test), end= '\n\n')
 
@@ -109,4 +113,4 @@ def train(path: str, subject: List, experiment: List, plot: bool):
 
 	# y_pred = pipe.predict(X_test)
 	# print(classification_report(y_test, pipe.predict(X_test), zero_division=0))
-	
+
