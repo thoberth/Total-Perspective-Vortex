@@ -1,9 +1,5 @@
-import matplotlib.pyplot as plt
-# from pyedflib import highlevel
-import numpy as np
 import os
 import mne
-from sklearn.linear_model import SGDClassifier 
 from tqdm.auto import tqdm
 import sys
 from typing import List

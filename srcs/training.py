@@ -1,18 +1,12 @@
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression as LR
-from sklearn.ensemble import RandomForestClassifier as RFC
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import accuracy_score, classification_report
-import sys, os
-from tqdm.auto import tqdm
 from typing import List
 from mne.io import read_raw_edf, concatenate_raws
 from mne.datasets.eegbci import load_data, standardize
-from mne import Epochs, events_from_annotations, annotations_from_events, set_log_level, pick_types
+from mne import Epochs, events_from_annotations, annotations_from_events, pick_types
 from mne.channels import make_standard_montage # "biosemi64"
-from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV
-from sklearn.decomposition import PCA
+from sklearn.model_selection import cross_val_score, train_test_split
 from itertools import chain
 from termcolor import colored
 import numpy as np
@@ -20,8 +14,7 @@ import matplotlib.pyplot as plt
 from mne.decoding import CSP
 from mne.preprocessing import ICA
 from mne.datasets import eegbci
-from multiprocessing import cpu_count
-from utils import save_model
+from model import Model
 
 def z_score_normalize(eeg_data):
 	mean_val = np.mean(eeg_data, axis=0)
@@ -55,9 +48,9 @@ def apply_ica(raw, picks, plot):
 	return raw
 
 
-def retrieve_raw_data(raw_fnames: str, plot : bool = False ):
+def retrieve_raw_data(raw_fnames: str, plot : bool = False, ica = False):
 	raw = concatenate_raws([read_raw_edf(f, preload=True) for f in raw_fnames])
-	events, _ = events_from_annotations(raw, verbose=False)
+	events, event_id = events_from_annotations(raw, verbose=False)
 	mapping = {1: 'rest', 2: 'feet', 3: 'hands'}
 	annot_from_events = annotations_from_events(
 		events=events, event_desc=mapping, sfreq=raw.info['sfreq'],
@@ -75,7 +68,8 @@ def retrieve_raw_data(raw_fnames: str, plot : bool = False ):
 
 	picks = pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude='bads')
 
-	raw = apply_ica(raw, picks, plot)
+	if ica:
+		raw = apply_ica(raw, picks, plot)
 
 	if plot:
 		plot_function(raw)
@@ -92,25 +86,16 @@ def retrieve_raw_data(raw_fnames: str, plot : bool = False ):
 	return X, y
 
 
-def train(path: str, subject: List, experiment: List, plot: bool):
+def train(path: str, subject: List, experiment: List, plot : bool, ica : bool):
 	print("Downloading files if they aren't already downloaded...")
+
 	path_to_stored_data = []
 	for index_subject in subject:
-		# print(f"Test for subject {index_subject}")
 		path_to_stored_data.append(load_data(subject=index_subject, runs=experiment, path=path))
 	path_to_stored_data = list(chain(*path_to_stored_data))
 	print("Retrieving data from edf files...", end="")
 	X, y = retrieve_raw_data(path_to_stored_data, plot)
 
-	X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
-	pipe = Pipeline([('csp', CSP(n_components=4, log=True)), ('svc', SVC())], verbose=False)
+	model = Model().fit(X, y)
 
-	cv_score = cross_val_score(pipe, X_train, y_train, cv=5, n_jobs=cpu_count() - 1)
-	print("\rMean accuracy on train set: ", cv_score.mean())
-	print("Accuracy on test set: ",  pipe.fit(X_train, y_train).score(X_test, y_test), end= '\n\n')
-
-	save_model(pipe)
-
-	# y_pred = pipe.predict(X_test)
-	# print(classification_report(y_test, pipe.predict(X_test), zero_division=0))
-
+	model.save_model()

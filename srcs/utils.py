@@ -56,18 +56,3 @@ def action_argument(value):
 	if value not in ["predict", "train", "cross_val"]:
 		raise argparse.ArgumentTypeError(f"The action value '{value}' must be 'train' or 'predict' or 'cross_val'")
 	return value
-
-def save_model(model: Pipeline):
-	path = os.getcwd()+'/model/'
-	if not os.path.exists(path):
-		os.makedirs('model')
-	with open(path+'pipeline.pickle', 'wb') as f:
-		pickle.dump(model, f)
-
-def load_model() -> Pipeline:
-	path=os.getcwd()+'/model/pipeline.pickle'
-	if not os.path.exists(path):
-		raise FileNotFoundError()
-	with open(path, 'rb') as f:
-		model = pickle.load(f)
-	return model
