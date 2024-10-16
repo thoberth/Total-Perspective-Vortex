@@ -8,22 +8,19 @@ from utils import retrieve_path, subject_argument, experiment_argument, action_a
 import os
 from training import train
 from predict import predict
-# from cross_validation import cross_val
 
 
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="This program can train and predict")
 
-	# argument of program
-	# required
-	parser.add_argument("-v", "--verbose")
+	parser.add_argument("-ica", default=False, action="store_true", help="Use ICA of MNE module for artifact removal")
+	parser.add_argument("-balanced", default=False, action="store_true", help="Train the model as a balanced dataset")
 	parser.add_argument("-p", "--plot", default=False, action="store_true", help="Plot the difference between raw data and data filtered")
 	parser.add_argument("action", nargs='?', default="cross_val", type=action_argument, help="Specify a number")
 	parser.add_argument("-s", "--subject", nargs='*', type=int, default=[1, 21], help="The subject(s) to train or to predict")
 	parser.add_argument("-e", "--experiment", nargs='*', type=int, default=[3, 14], help="The experiment(s) to train or to predict")
 
-	# optional
 	args = parser.parse_args()
 	try:
 		args.subject = subject_argument(args.subject)
@@ -34,6 +31,6 @@ if __name__ == "__main__":
 	path = retrieve_path()
 
 	if args.action == 'train':
-		train(path, args.subject, args.experiment, args.plot)
+		train(path, args.subject, args.experiment, args.plot, args.ica, args.balanced)
 	elif args.action == 'predict':
 		predict(path, args.subject, args.experiment)

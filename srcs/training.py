@@ -1,20 +1,17 @@
-from sklearn.pipeline import Pipeline
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, classification_report
+
 from typing import List
 from mne.io import read_raw_edf, concatenate_raws
-from mne.datasets.eegbci import load_data, standardize
+from mne.datasets.eegbci import load_data
 from mne import Epochs, events_from_annotations, annotations_from_events, pick_types
-from mne.channels import make_standard_montage # "biosemi64"
-from sklearn.model_selection import cross_val_score, train_test_split
+from mne.channels import make_standard_montage
 from itertools import chain
 from termcolor import colored
 import numpy as np
 import matplotlib.pyplot as plt
-from mne.decoding import CSP
 from mne.preprocessing import ICA
 from mne.datasets import eegbci
 from model import Model
+from tqdm.auto import tqdm
 
 def z_score_normalize(eeg_data):
 	mean_val = np.mean(eeg_data, axis=0)
@@ -28,7 +25,7 @@ def plot_function(raw):
 		plt.show()
 
 def apply_ica(raw, picks, plot):
-	print("\rCompute ICA ..." + " " * 20,  end="")
+	print("Compute ICA ...")
 	ica = ICA(method='fastica', random_state=97, max_iter='auto')
 	ica.fit(raw, picks=picks)
 
@@ -41,7 +38,7 @@ def apply_ica(raw, picks, plot):
 		ica.plot_components(picks=ica.exclude, show=True)
 
 	# Reconstruire les signaux EEG sans les artefacts
-	print("\rApply ICA ...           ", end="")
+	print("Apply ICA ...")
 	# print(f"Exclude : {ica.exclude}")
 	raw = ica.apply(raw.copy(), exclude=ica.exclude)
 
@@ -81,21 +78,21 @@ def retrieve_raw_data(raw_fnames: str, plot : bool = False, ica = False):
 		exit(1)
 	y = np.array(raw.events[:, -1])
 	X =	raw.get_data()
-	print("\rStandardize data ...", end="")
+	print("Standardize data ...")
 	X = z_score_normalize(X)
 	return X, y
 
 
-def train(path: str, subject: List, experiment: List, plot : bool, ica : bool):
+def train(path: str, subject: List, experiment: List, plot : bool, ica : bool, balanced):
 	print("Downloading files if they aren't already downloaded...")
 
 	path_to_stored_data = []
-	for index_subject in subject:
+	for index_subject in tqdm(subject):
 		path_to_stored_data.append(load_data(subject=index_subject, runs=experiment, path=path))
 	path_to_stored_data = list(chain(*path_to_stored_data))
-	print("Retrieving data from edf files...", end="")
-	X, y = retrieve_raw_data(path_to_stored_data, plot)
+	print("Retrieving data from edf files...")
+	X, y = retrieve_raw_data(path_to_stored_data, plot, ica)
 
-	model = Model().fit(X, y)
+	model = Model(balanced).fit(X, y)
 
 	model.save_model()
